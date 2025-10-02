@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Meteor Madness - Ultimate Simulator</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+  body { font-family: Arial, sans-serif; background: #0a0a1a; color: #fff; text-align: center; margin:0; }
+  #controls { padding: 10px; background: #111; }
+  input, button { margin: 4px; padding: 6px; }
+  .info-box { background: #111; padding: 10px; border-radius: 8px; margin-top: 10px; display:inline-block; }
+  #map { height: 500px; margin: 10px auto; width: 90%; border: 2px solid #333; }
+  canvas { display:block; margin: 10px auto; border:1px solid #333; }
+  .tooltip { font-size:12px; color:#aaa; }
+</style>
+</head>
+<body>
+<h1>🌍 Meteor Madness - Ultimate Simulator</h1>
+
+<div id="controls">
+  <label>Asteroid Diameter (m): <input id="diameter" type="number" value="100"></label>
+  <label>Velocity (km/s): <input id="velocity" type="number" value="20"></label><br>
+  <label>Deflection Power (%): <input id="deflectPower" type="number" value="20"></label>
+  <label>Deflection Angle (°): <input id="deflectAngle" type="number" value="30"></label><br>
+  <button onclick="simulateImpact()">💥 Simulate Impact</button>
+  <button onclick="defendEarth()">🛡 Defend Earth</button>
+</div>
+
+<div class="info-box" id="results"></div>
+<div id="map"></div>
+<canvas id="orbitCanvas" width="600" height="400"></canvas>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+// ---------------- Leaflet Map ----------------
+var map = L.map('map').setView([20,0],2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:6 }).addTo(map);
+
+let impactCircle, seismicCircle, tsunamiCircle;
+let currentImpact = null;
+
+map.on('click', function(e){
+  currentImpact = { lat: e.latlng.lat, lon: e.latlng.lng };
+  alert(`Impact location set at Lat:${currentImpact.lat.toFixed(2)}, Lon:${currentImpact.lon.toFixed(2)}`);
+});
+
+// ---------------- Impact Simulation ----------------
+function simulateImpact(){
+  let d = parseFloat(document.getElementById("diameter").value);
+  let v = parseFloat(document.getElementById("velocity").value)*1000;
+  let density=3000, radius=d/2, volume=(4/3)*Math.PI*Math.pow(radius,3), mass=volume*density;
+  let energyJ=0.5*mass*v*v;
+  let energyTNT=energyJ/(4.184e9);
+  let energyMT=(energyTNT/1e6).toFixed(2);
+  let craterD=(1.161*Math.pow(energyTNT,1/3.4)).toFixed(2);
+
+  document.getElementById("results").innerHTML=
+    `<b>Impact Energy:</b> ${energyMT} Megatons TNT<br>
+     <b>Estimated Crater Diameter:</b> ${craterD} km`;
+
+  if(!currentImpact){
+    currentImpact = { lat: Math.random()*140-70, lon: Math.random()*360-180 };
+  }
+
+  if(impactCircle) map.removeLayer(impactCircle);
+  if(seismicCircle) map.removeLayer(seismicCircle);
+  if(tsunamiCircle) map.removeLayer(tsunamiCircle);
+
+  impactCircle=L.circle([currentImpact.lat,currentImpact.lon],{radius:craterD*500,color:'red'}).addTo(map);
+  seismicCircle=L.circle([currentImpact.lat,currentImpact.lon],{radius:craterD*2000,color:'orange'}).addTo(map);
+  tsunamiCircle=L.circle([currentImpact.lat,currentImpact.lon],{radius:craterD*5000,color:'blue',fillOpacity:0.2}).addTo(map);
+  map.setView([currentImpact.lat,currentImpact.lon],4);
+
+  animateOrbit();
+}
+
+// ---------------- Deflection ----------------
+function defendEarth(){
+  if(!currentImpact){ alert("Simulate an impact first!"); return; }
+  let power=parseFloat(document.getElementById("deflectPower").value);
+  let angle=parseFloat(document.getElementById("deflectAngle").value);
+
+  let deflectLat=currentImpact.lat+(Math.random()*power-power/2)*Math.sin(angle*Math.PI/180);
+  let deflectLon=currentImpact.lon+(Math.random()*power-power/2)*Math.cos(angle*Math.PI/180);
+
+  map.removeLayer(impactCircle);
+  map.removeLayer(seismicCircle);
+  map.removeLayer(tsunamiCircle);
+
+  impactCircle=L.circle([deflectLat,deflectLon],{radius:0,color:'green'}).addTo(map);
+  map.setView([deflectLat,deflectLon],4);
+  document.getElementById("results").innerHTML+=`<br>🛡 Asteroid deflected! Earth is safe.`;
+}
+
+// ---------------- Orbit Animation (Canvas) ----------------
+function animateOrbit(){
+  const canvas=document.getElementById('orbitCanvas');
+  const ctx=canvas.getContext('2d');
+  let t=0;
+  const centerX=canvas.width/2;
+  const centerY=canvas.height/2;
+  const radius=150;
+
+  function draw(){
+    ctx.fillStyle='#0a0a1a'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // Earth
+    ctx.beginPath();
+    ctx.arc(centerX,centerY,20,0,2*Math.PI);
+    ctx.fillStyle='blue'; ctx.fill();
+
+    // Asteroid
+    let angle=(t/100)*2*Math.PI;
+    let x=centerX+radius*Math.cos(angle);
+    let y=centerY+radius*Math.sin(angle);
+    ctx.beginPath();
+    ctx.arc(x,y,8,0,2*Math.PI);
+    ctx.fillStyle='red'; ctx.fill();
+
+    t+=1;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+</script>
+</body>
+</html>
